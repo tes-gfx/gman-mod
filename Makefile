@@ -1,5 +1,6 @@
 obj-m := gman.o
 gman-y := \
+	gman_gem.o \
 	gman_drv.o
 
 #ccflags-y := -DDISABLE_ASSERTIONS
@@ -19,7 +20,7 @@ modules_install:
 
 .PHONY:
 clean:
-	rm -f *.o *~ core .depend .*.cmd *.ko *.mod.c
+	rm -f *.o *~ core .depend .*.cmd *.ko *.mod.c *.a *.mod
 	rm -f Module.markers Module.symvers modules.order
 	rm -rf .tmp_versions Modules.symvers
 

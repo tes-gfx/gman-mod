@@ -4,9 +4,92 @@
 #include <drm/drm_gem_cma_helper.h>
 
 #include "gman_drv.h"
+#include "gman_gem.h"
+#include "gman_drm.h"
 
 static struct class *gman_class;
 struct gman_device *gman_device;
+
+static int gman_ioctl_gem_new(struct drm_device *dev, void *data,
+	struct drm_file *file)
+{
+	struct drm_gman_gem_new *args = data;
+	struct drm_gem_object *bo = NULL;
+	dma_addr_t paddr;
+	int ret;
+
+	dev_dbg(dev->dev, "New bo:\n");
+	dev_dbg(dev->dev, " size=0x%08llx\n", args->size);
+	dev_dbg(dev->dev, " flags=0x%08x\n", args->flags);
+
+	if (args->flags & ~(GMAN_BO_CACHED | GMAN_BO_WC | GMAN_BO_UNCACHED))
+			return -EINVAL;
+
+	bo = gman_gem_new(dev, args->size, &paddr);
+	if(IS_ERR(bo))
+		return PTR_ERR(bo);
+
+	args->paddr = paddr;
+	dev_dbg(dev->dev, " paddr=0x%08llx\n", args->paddr);
+
+	ret = drm_gem_handle_create(file, bo, &args->handle);
+	drm_gem_object_put_unlocked(bo);
+
+	dev_dbg(dev->dev, " handle=0x%08x\n", args->handle);
+	dev_dbg(dev->dev, " obj=0x%p\n", bo);
+
+	return ret;
+}
+
+static int gman_ioctl_gem_info(struct drm_device *dev, void *data,
+		struct drm_file *file)
+{
+	struct drm_gman_gem_info *args = data;
+	struct drm_gem_object *obj;
+	int ret;
+
+	if (args->pad)
+		return -EINVAL;
+
+	obj = drm_gem_object_lookup(file, args->handle);
+	if (!obj)
+		return -ENOENT;
+
+	ret = gman_gem_mmap_offset(obj, &args->offset);
+	drm_gem_object_put_unlocked(obj);
+
+	return ret;
+}
+
+static int gman_ioctl_gem_user(struct drm_device *dev, void *data,
+		struct drm_file *file)
+{
+	struct drm_gman_gem_user *args = data;
+	struct drm_gem_object *obj;
+	struct drm_gem_cma_object *obj_cma;
+
+	if (args->pad)
+		return -EINVAL;
+
+	obj = drm_gem_object_lookup(file, args->handle);
+	if (!obj)
+		return -ENOENT;
+
+	obj_cma = to_drm_gem_cma_obj(obj);
+	args->paddr = obj_cma->paddr;
+
+	drm_gem_object_put_unlocked(obj);
+
+	return 0;
+}
+
+static const struct drm_ioctl_desc gman_ioctls[] = {
+#define GMAN_IOCTL(n, func, flags) \
+	DRM_IOCTL_DEF_DRV(GMAN_##n, gman_ioctl_##func, flags)
+	GMAN_IOCTL(GEM_NEW,       gem_new,       DRM_AUTH|DRM_RENDER_ALLOW),
+	GMAN_IOCTL(GEM_INFO,      gem_info,      DRM_AUTH|DRM_RENDER_ALLOW),
+	GMAN_IOCTL(GEM_USER,      gem_user,      DRM_AUTH|DRM_RENDER_ALLOW),
+};
 
 DEFINE_DRM_GEM_CMA_FOPS(gman_fops);
 
@@ -22,8 +105,10 @@ static struct drm_driver gman_driver = {
 	.gem_prime_vunmap	= drm_gem_cma_prime_vunmap,
 	.gem_prime_mmap		= drm_gem_cma_prime_mmap,
 	.dumb_create		= drm_gem_cma_dumb_create,
+	.ioctls         = gman_ioctls,
+	.num_ioctls     = DRM_GMAN_NUM_IOCTLS,
 	.fops			= &gman_fops,
-	.name			= "gman",
+	.name			= "tes-gman",
 	.desc			= "TES Graphics Manager",
 	.date			= "20220721",
 	.major			= 1,
@@ -45,6 +130,10 @@ static int gman_init_internal(struct device *dev)
 	struct gman_device *gdev;
 	struct drm_device *ddev;
 	int ret;
+
+	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+	if(ret)
+		return ret;
 
 	gdev = devm_kzalloc(dev, sizeof(*gdev), GFP_KERNEL);
 	if (gdev == NULL)
