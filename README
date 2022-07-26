@@ -1,0 +1,26 @@
+# GMAN module
+GMAN is the Gfx Manager for TES EvalKits and MUST NOT be used in a production
+system for safety and security reasons.
+It is a virtual DRM module, not backed by any hardware. It can be used to
+allocate video memory via GEM for a TES IP cores. Therefore, it returns BO
+handles to an user space application that can be used to map the video memory
+into its memory space. It is also able to determine the physical address
+of a BO and return it to user space.
+
+For the DE10-Nano board, the module will also act as a dummy KMS module and
+bring up the ADV7511 as a DRM bridge. A CDC display controller can be used
+for display output to ADV7511's DPI-2 interface without any further
+configuration.
+Note that the ADV7511 bridge driver will check the EDID of a connected display
+and check the available modes against a hardcoded frequency value of 65 MHz.
+That means either the CDC must be connected to a 65 MHz clock or the driver
+code must be modified to match the actual clock frquency.
+65 MHz matches the pixel frequency of a 1024x768@60Hz mode.
+
+# Remarks
+Handling physical addresses in Linux user space is a bad idea. It makes the
+system very vulnerable. Since hardware blocks in an embedded system can usually
+access all the system's memory, they can be used to circumvent Linux memory
+protection. Furthermore, the system will become vulnerable against simple
+user land application bugs.
+Use GMAN for evaluation only.
