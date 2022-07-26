@@ -153,9 +153,8 @@ static int gman_init_internal(struct device *dev)
 {
 	struct gman_device *gdev;
 	struct drm_device *ddev;
-	struct i2c_client *i2c_slave;
+	struct i2c_client *i2c_bridge;
 	struct drm_bridge *bridge;
-	struct drm_i2c_encoder_driver *enc_drv;
 	int ret;
 
 	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
@@ -175,10 +174,10 @@ static int gman_init_internal(struct device *dev)
 	gdev->ddev = ddev;
 	ddev->dev_private = gdev;
 
-	i2c_slave = find_encoder_slave("adv7511");
-	if(i2c_slave) {
-		DRM_INFO("Found encoder slave %s\n", i2c_slave->name);
-		bridge = of_drm_find_bridge(i2c_slave->dev.of_node);
+	i2c_bridge = find_encoder_slave("adv7511");
+	if(i2c_bridge) {
+		DRM_INFO("gman: Found DRM bridge device %s\n", i2c_bridge->name);
+		bridge = of_drm_find_bridge(i2c_bridge->dev.of_node);
 
 		ret = gman_modeset_init(gdev, bridge);
 		if (ret != 0)
@@ -188,8 +187,6 @@ static int gman_init_internal(struct device *dev)
 	ret = drm_dev_register(ddev, 0);
 	if (ret)
 		goto error;
-
-	DRM_INFO("%s initialized\n", dev_name(dev));
 
 	gman_device = gdev;
 

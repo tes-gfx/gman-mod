@@ -17,8 +17,6 @@ struct gman_encoder;
 struct gman_device {
 	struct device *dev;
 	struct drm_device *ddev;
-	struct gman_drm_connector connector;
-	struct gman_drm_encoder encoder;
 	struct drm_simple_display_pipe pipe;
 };
 
