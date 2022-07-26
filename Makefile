@@ -1,5 +1,6 @@
 obj-m := gman.o
 gman-y := \
+	gman_kms.o \
 	gman_gem.o \
 	gman_drv.o
 

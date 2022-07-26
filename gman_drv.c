@@ -1,11 +1,14 @@
 #include <linux/module.h>
+#include <linux/device.h>
 
 #include <drm/drm_drv.h>
 #include <drm/drm_gem_cma_helper.h>
+#include <drm/drm_encoder_slave.h>
 
 #include "gman_drv.h"
 #include "gman_gem.h"
 #include "gman_drm.h"
+#include "gman_kms.h"
 
 static struct class *gman_class;
 struct gman_device *gman_device;
@@ -94,7 +97,7 @@ static const struct drm_ioctl_desc gman_ioctls[] = {
 DEFINE_DRM_GEM_CMA_FOPS(gman_fops);
 
 static struct drm_driver gman_driver = {
-	.driver_features	= DRIVER_GEM | DRIVER_ATOMIC,
+	.driver_features	= DRIVER_GEM | DRIVER_ATOMIC | DRIVER_MODESET,
 	.gem_free_object_unlocked = drm_gem_cma_free_object,
 	.gem_vm_ops		= &drm_gem_cma_vm_ops,
 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
@@ -115,11 +118,32 @@ static struct drm_driver gman_driver = {
 	.minor			= 0,
 };
 
+static int match_encoder_slave(struct device *dev, const void *data)
+{
+	const char *name = data;
+	return dev->driver && strcmp(dev->driver->name, name) == 0;
+}
+
+static struct i2c_client *find_encoder_slave(const char *driver_name)
+{
+	struct device *dev;
+	struct i2c_client *i2c_client;
+
+	dev = bus_find_device(&i2c_bus_type, NULL, driver_name, match_encoder_slave);
+
+	if(!dev)
+		return NULL;
+
+	i2c_client = to_i2c_client(dev);
+	return i2c_client;
+}
+
 static int gman_remove(struct gman_device *gdev)
 {
 	struct drm_device *ddev = gdev->ddev;
 
 	drm_dev_unregister(ddev);
+	drm_mode_config_cleanup(ddev);
 	drm_dev_put(ddev);
 
 	return 0;
@@ -129,10 +153,13 @@ static int gman_init_internal(struct device *dev)
 {
 	struct gman_device *gdev;
 	struct drm_device *ddev;
+	struct i2c_client *i2c_slave;
+	struct drm_bridge *bridge;
+	struct drm_i2c_encoder_driver *enc_drv;
 	int ret;
 
 	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
-	if(ret)
+	if (ret)
 		return ret;
 
 	gdev = devm_kzalloc(dev, sizeof(*gdev), GFP_KERNEL);
@@ -147,6 +174,16 @@ static int gman_init_internal(struct device *dev)
 
 	gdev->ddev = ddev;
 	ddev->dev_private = gdev;
+
+	i2c_slave = find_encoder_slave("adv7511");
+	if(i2c_slave) {
+		DRM_INFO("Found encoder slave %s\n", i2c_slave->name);
+		bridge = of_drm_find_bridge(i2c_slave->dev.of_node);
+
+		ret = gman_modeset_init(gdev, bridge);
+		if (ret != 0)
+			goto error;
+	}
 
 	ret = drm_dev_register(ddev, 0);
 	if (ret)

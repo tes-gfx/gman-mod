@@ -3,6 +3,9 @@
 
 #include <linux/kernel.h>
 #include <linux/wait.h>
+#include <drm/drm_simple_kms_helper.h>
+
+#include "gman_kms.h"
 
 struct clk;
 struct device;
@@ -13,15 +16,10 @@ struct gman_encoder;
 
 struct gman_device {
 	struct device *dev;
-
-	void __iomem *mmio;
-
 	struct drm_device *ddev;
-
-	struct gman_crtc *crtcs;
-	unsigned int num_crtcs;
-
-	struct gman_encoder *encoders;
+	struct gman_drm_connector connector;
+	struct gman_drm_encoder encoder;
+	struct drm_simple_display_pipe pipe;
 };
 
 #endif /* __GMAN_DRV_H__ */
