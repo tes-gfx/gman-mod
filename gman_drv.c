@@ -4,6 +4,7 @@
 #include <drm/drm_drv.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_encoder_slave.h>
+#include <drm/drm_fb_helper.h>
 
 #include "gman_drv.h"
 #include "gman_gem.h"
@@ -11,7 +12,7 @@
 #include "gman_kms.h"
 
 static struct class *gman_class;
-struct gman_device *gman_device;
+static struct gman_device *gman_device;
 
 static int gman_ioctl_gem_new(struct drm_device *dev, void *data,
 	struct drm_file *file)
@@ -154,7 +155,6 @@ static int gman_init_internal(struct device *dev)
 	struct gman_device *gdev;
 	struct drm_device *ddev;
 	struct i2c_client *i2c_bridge;
-	struct drm_bridge *bridge;
 	int ret;
 
 	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
@@ -177,9 +177,9 @@ static int gman_init_internal(struct device *dev)
 	i2c_bridge = find_encoder_slave("adv7511");
 	if(i2c_bridge) {
 		DRM_INFO("gman: Found DRM bridge device %s\n", i2c_bridge->name);
-		bridge = of_drm_find_bridge(i2c_bridge->dev.of_node);
+		gdev->bridge = of_drm_find_bridge(i2c_bridge->dev.of_node);
 
-		ret = gman_modeset_init(gdev, bridge);
+		ret = gman_modeset_init(gdev);
 		if (ret != 0)
 			goto error;
 	}
@@ -189,6 +189,12 @@ static int gman_init_internal(struct device *dev)
 		goto error;
 
 	gman_device = gdev;
+
+	/* Establish a dummy client to enable the bridge. We simply use fbdev and don't
+	 * care about the wasted memory for the frame buffer.
+	 */
+	if (gdev->bridge)
+		drm_fbdev_generic_setup(ddev, 0);
 
 	return 0;
 

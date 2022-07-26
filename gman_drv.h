@@ -4,6 +4,7 @@
 #include <linux/kernel.h>
 #include <linux/wait.h>
 #include <drm/drm_simple_kms_helper.h>
+#include <drm/drm_bridge.h>
 
 #include "gman_kms.h"
 
@@ -18,6 +19,7 @@ struct gman_device {
 	struct device *dev;
 	struct drm_device *ddev;
 	struct drm_simple_display_pipe pipe;
+	struct drm_bridge *bridge;
 };
 
 #endif /* __GMAN_DRV_H__ */

@@ -1,10 +1,12 @@
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_probe_helper.h>
+#include <drm/drm_crtc_helper.h>
 #include <drm/drm_simple_kms_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_bridge.h>
 #include <drm/drm_vblank.h>
+#include <drm/drm_fb_helper.h>
 
 #include "gman_drv.h"
 #include "gman_kms.h"
@@ -70,7 +72,7 @@ static const uint64_t gman_modifiers[] = {
 	DRM_FORMAT_MOD_INVALID
 };
 
-int gman_modeset_init(struct gman_device *gdev, struct drm_bridge *bridge)
+int gman_modeset_init(struct gman_device *gdev)
 {
     struct drm_device *ddev = gdev->ddev;
 	struct drm_mode_config *mode_config;
@@ -91,7 +93,7 @@ int gman_modeset_init(struct gman_device *gdev, struct drm_bridge *bridge)
         return ret;
     }
 
-    ret = drm_simple_display_pipe_attach_bridge(&gdev->pipe, bridge);
+    ret = drm_simple_display_pipe_attach_bridge(&gdev->pipe, gdev->bridge);
     if (ret) {
         DRM_ERROR("Could not attach bridge.");
         return ret;

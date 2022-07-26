@@ -16,7 +16,6 @@ struct gman_drm_encoder {
 	struct drm_encoder_slave slave;
 };
 
-int gman_modeset_init(struct gman_device *gdev, struct drm_bridge *bridge);
-int gman_encoder_init(struct gman_device *gdev);
+int gman_modeset_init(struct gman_device *gdev);
 
 #endif
