@@ -4,6 +4,7 @@
 #include <drm/drm_simple_kms_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_bridge.h>
+#include <drm/drm_vblank.h>
 
 #include "gman_drv.h"
 #include "gman_kms.h"
@@ -30,36 +31,33 @@ static const struct drm_mode_config_funcs mode_config_funcs = {
 static enum drm_mode_status gman_pipe_mode_valid(struct drm_crtc *crtc,
 						   const struct drm_display_mode *mode)
 {
-    DRM_INFO("%s", __func__);
+	/* Clock is fixed to 65 MHz */
+	if (mode->clock > 65000) {
+		return MODE_CLOCK_HIGH;
+	}
+	if (mode->clock < 65000) {
+		return MODE_CLOCK_LOW;
+	}
+
     return MODE_OK;
-}
-
-static int gman_pipe_check(struct drm_simple_display_pipe *pipe,
-			     struct drm_plane_state *plane_state,
-			     struct drm_crtc_state *crtc_state)
-{
-    DRM_INFO("%s", __func__);
-    return 0;
-}
-
-static void gman_pipe_enable(struct drm_simple_display_pipe *pipe,
-			       struct drm_crtc_state *crtc_state,
-			       struct drm_plane_state *plane_state)
-{
-    DRM_INFO("%s", __func__);
 }
 
 static void gman_pipe_update(struct drm_simple_display_pipe *pipe,
 			       struct drm_plane_state *old_state)
 {
-    DRM_INFO("%s", __func__);
+	struct drm_crtc *crtc = &pipe->crtc;
+
+	if (crtc->state->event) {
+		spin_lock_irq(&crtc->dev->event_lock);
+		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+		crtc->state->event = NULL;
+		spin_unlock_irq(&crtc->dev->event_lock);
+	}
 }
 
 static const struct drm_simple_display_pipe_funcs gman_pipe_funcs = {
 	.mode_valid = gman_pipe_mode_valid,
-	.check	    = gman_pipe_check,
-	.enable	    = gman_pipe_enable,
-	.update	    = gman_pipe_update,
+	.update = gman_pipe_update,
 };
 
 static const uint32_t gman_formats[] = {
